@@ -7,9 +7,11 @@ watched with zero API keys, then real agents can be swapped in.
 
 This repository currently contains the game engine -- deterministic
 iterated Prisoner's Dilemma and resource-splitting games, plus a set of
-scripted bots -- and a minimal MCP tool contract that lets any
-MCP-speaking agent submit moves against that engine from its own process,
-all backed by a fixed-seed test suite.
+scripted bots -- a minimal MCP tool contract that lets any MCP-speaking
+agent submit moves against that engine from its own process, and a
+terminal broadcast that runs a round-robin tournament between any set of
+agents and redraws a live score table, bracket, and round-by-round move
+history after each match, all backed by a fixed-seed test suite.
 
 ## Install
 
@@ -100,6 +102,32 @@ Content-Length framing, but the same `method`/`params`/`result` shapes, so
 a tool written against this contract needs no changes to speak the full
 spec. No network socket is involved; everything happens over local
 process stdio, exactly as described here.
+
+### Terminal broadcast
+
+`src/tui/cli.js` runs a full round-robin tournament between any set of
+scripted bots and broadcasts it to the terminal, redrawing a live score
+table, a bracket of every pairing (pending vs. done), and the
+round-by-round move history of the most recently finished match -- one
+frame per completed match, like a chess broadcast updating its board
+after each move:
+
+```
+npm start -- prisonersDilemma titForTat alwaysDefect grimTrigger
+npm start -- resourceSplit fairSplitter greedySplitter randomSplitter:7
+```
+
+The first argument picks the game (`prisonersDilemma` or
+`resourceSplit`), the rest name the bots from that game's bot module
+(`src/bots/*.js`); bots that take a seed can be given as `name:seed`.
+Rendering is a plain-text table layout drawn with ANSI clear-screen and
+cursor-home escape codes -- no terminal UI dependency, since the layout
+is just padded columns and a redraw is just "clear and print again."
+`src/tui/render.js` builds each frame as a pure string so the layout can
+be unit tested without a real terminal; `src/tui/screen.js` is the only
+module that writes to the terminal, and `src/tui/broadcast.js` paces the
+redraws against `src/tournament/roundRobin.js`, which plays every unique
+pairing of agents once and ranks the resulting standings.
 
 Run the test suite:
 
