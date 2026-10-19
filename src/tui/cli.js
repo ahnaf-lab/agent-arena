@@ -6,6 +6,10 @@
 // Examples:
 //   node src/tui/cli.js prisonersDilemma titForTat alwaysDefect grimTrigger
 //   node src/tui/cli.js resourceSplit fairSplitter greedySplitter randomSplitter:7
+//
+// Run with no arguments at all and it falls back to DEFAULT_DEMO below, a
+// zero-config Prisoner's Dilemma tournament between the four built-in bots
+// -- the "watch it work with no API keys" path.
 
 import * as prisonersDilemma from '../engine/prisonersDilemma.js';
 import * as resourceSplit from '../engine/resourceSplit.js';
@@ -18,6 +22,10 @@ const GAMES = {
   prisonersDilemma: { engine: prisonersDilemma, bots: prisonersDilemmaBots, defaultRounds: 10 },
   resourceSplit: { engine: resourceSplit, bots: resourceSplitBots, defaultRounds: 10 },
 };
+
+// The no-API-key demo: four scripted bots playing iterated Prisoner's
+// Dilemma, requiring nothing but `npm start`.
+export const DEFAULT_DEMO = ['prisonersDilemma', 'titForTat', 'randomBot:1', 'grimTrigger', 'alwaysCooperate'];
 
 function buildBot(bots, spec) {
   const [botName, rawSeed] = spec.split(':');
@@ -34,7 +42,7 @@ function buildBot(bots, spec) {
 }
 
 export function parseArgs(argv) {
-  const [gameName, ...botSpecs] = argv;
+  const [gameName, ...botSpecs] = argv.length === 0 ? DEFAULT_DEMO : argv;
   if (!gameName || !GAMES[gameName]) {
     throw new Error(`usage: cli.js <${Object.keys(GAMES).join('|')}> <bot> <bot> [bot...]`);
   }

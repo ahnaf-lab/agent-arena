@@ -7,7 +7,7 @@ import {
   alwaysDefect,
   titForTat,
 } from '../src/bots/prisonersDilemmaBots.js';
-import { parseArgs } from '../src/tui/cli.js';
+import { parseArgs, DEFAULT_DEMO } from '../src/tui/cli.js';
 
 function fakeScreen() {
   const frames = [];
@@ -46,4 +46,12 @@ test('cli parseArgs rejects an unknown game', () => {
 
 test('cli parseArgs rejects fewer than two bots', () => {
   assert.throws(() => parseArgs(['prisonersDilemma', 'titForTat']));
+});
+
+test('cli parseArgs falls back to the no-API-key demo tournament when run with no arguments', () => {
+  const { gameName, botSpecs } = parseArgs([]);
+  const [demoGame, ...demoBotSpecs] = DEFAULT_DEMO;
+  assert.strictEqual(gameName, demoGame);
+  assert.deepStrictEqual(botSpecs, demoBotSpecs);
+  assert.ok(botSpecs.length >= 2);
 });

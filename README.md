@@ -117,6 +117,12 @@ npm start -- prisonersDilemma titForTat alwaysDefect grimTrigger
 npm start -- resourceSplit fairSplitter greedySplitter randomSplitter:7
 ```
 
+Run it with no arguments at all (`npm start` or `npm run demo`) and it
+falls back to a zero-config demo tournament: iterated Prisoner's Dilemma
+between the four built-in bots -- `titForTat`, `randomBot`, `grimTrigger`,
+`alwaysCooperate` -- so a full broadcast can be watched with nothing but
+`npm install`, no API keys or extra arguments required.
+
 The first argument picks the game (`prisonersDilemma` or
 `resourceSplit`), the rest name the bots from that game's bot module
 (`src/bots/*.js`); bots that take a seed can be given as `name:seed`.
