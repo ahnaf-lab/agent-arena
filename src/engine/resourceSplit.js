@@ -16,14 +16,18 @@ function validateClaim(claim, pool, agentLabel) {
   return claim;
 }
 
-export function playRound(agentA, agentB, pool, history) {
+// chooseClaim may return a claim directly or a Promise of one -- the latter
+// is what an MCP-speaking agent looks like, since its answer comes back over
+// an out-of-process RPC round trip. Awaiting a non-Promise value resolves
+// immediately, so in-process bots are unaffected.
+export async function playRound(agentA, agentB, pool, history) {
   const claimA = validateClaim(
-    agentA.chooseClaim(pool, history, 0),
+    await agentA.chooseClaim(pool, history, 0),
     pool,
     agentA.name ?? 'agentA'
   );
   const claimB = validateClaim(
-    agentB.chooseClaim(pool, history, 1),
+    await agentB.chooseClaim(pool, history, 1),
     pool,
     agentB.name ?? 'agentB'
   );
@@ -34,7 +38,7 @@ export function playRound(agentA, agentB, pool, history) {
   return { claims: [claimA, claimB], payouts, overClaimed };
 }
 
-export function runMatch(agentA, agentB, rounds, options = {}) {
+export async function runMatch(agentA, agentB, rounds, options = {}) {
   const pool = options.pool ?? 100;
   if (!Number.isInteger(rounds) || rounds < 1) {
     throw new Error('rounds must be a positive integer');
@@ -45,7 +49,7 @@ export function runMatch(agentA, agentB, rounds, options = {}) {
 
   const history = [];
   for (let i = 0; i < rounds; i++) {
-    history.push(playRound(agentA, agentB, pool, history));
+    history.push(await playRound(agentA, agentB, pool, history));
   }
 
   const totals = history.reduce(

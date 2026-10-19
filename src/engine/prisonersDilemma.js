@@ -27,14 +27,18 @@ function validateMove(move, agentLabel) {
   return move;
 }
 
-export function playRound(agentA, agentB, history, payoffMatrix) {
-  const moveA = validateMove(agentA.chooseMove(history, 0), agentA.name ?? 'agentA');
-  const moveB = validateMove(agentB.chooseMove(history, 1), agentB.name ?? 'agentB');
+// chooseMove may return a move directly or a Promise of one -- the latter is
+// what an MCP-speaking agent looks like, since its answer comes back over an
+// out-of-process RPC round trip. Awaiting a non-Promise value resolves
+// immediately, so in-process bots are unaffected.
+export async function playRound(agentA, agentB, history, payoffMatrix) {
+  const moveA = validateMove(await agentA.chooseMove(history, 0), agentA.name ?? 'agentA');
+  const moveB = validateMove(await agentB.chooseMove(history, 1), agentB.name ?? 'agentB');
   const [scoreA, scoreB] = payoffMatrix[moveA][moveB];
   return { moves: [moveA, moveB], scores: [scoreA, scoreB] };
 }
 
-export function runMatch(agentA, agentB, rounds, options = {}) {
+export async function runMatch(agentA, agentB, rounds, options = {}) {
   const payoffMatrix = options.payoffMatrix ?? DEFAULT_PAYOFF_MATRIX;
   if (!Number.isInteger(rounds) || rounds < 1) {
     throw new Error('rounds must be a positive integer');
@@ -42,7 +46,7 @@ export function runMatch(agentA, agentB, rounds, options = {}) {
 
   const history = [];
   for (let i = 0; i < rounds; i++) {
-    history.push(playRound(agentA, agentB, history, payoffMatrix));
+    history.push(await playRound(agentA, agentB, history, payoffMatrix));
   }
 
   const totals = history.reduce(
