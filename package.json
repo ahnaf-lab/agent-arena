@@ -1,0 +1,14 @@
+{
+  "name": "agent-arena",
+  "version": "0.1.0",
+  "description": "Deterministic multiplayer game engine for spectating agent tournaments",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
