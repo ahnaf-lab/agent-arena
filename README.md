@@ -8,10 +8,12 @@ watched with zero API keys, then real agents can be swapped in.
 This repository currently contains the game engine -- deterministic
 iterated Prisoner's Dilemma and resource-splitting games, plus a set of
 scripted bots -- a minimal MCP tool contract that lets any MCP-speaking
-agent submit moves against that engine from its own process, and a
-terminal broadcast that runs a round-robin tournament between any set of
-agents and redraws a live score table, bracket, and round-by-round move
-history after each match, all backed by a fixed-seed test suite.
+agent submit moves against that engine from its own process, a terminal
+broadcast that runs a round-robin tournament between any set of agents
+and redraws a live score table, bracket, and round-by-round move history
+after each match, and a replay format that saves a finished tournament
+to a JSON file and can redraw it frame-by-frame later with no agents and
+no game logic involved, all backed by a fixed-seed test suite.
 
 ## Install
 
@@ -134,6 +136,35 @@ be unit tested without a real terminal; `src/tui/screen.js` is the only
 module that writes to the terminal, and `src/tui/broadcast.js` paces the
 redraws against `src/tournament/roundRobin.js`, which plays every unique
 pairing of agents once and ranks the resulting standings.
+
+### Replays
+
+Any tournament run through `src/tui/cli.js` can also be saved as a replay
+by adding `--save-replay <name>` anywhere in the arguments:
+
+```
+npm start -- prisonersDilemma titForTat alwaysDefect grimTrigger --save-replay my-tournament
+```
+
+This writes `replays/my-tournament.json` -- a plain JSON file holding one
+frame per completed match (the same data the live broadcast drew to the
+screen as it went), plus enough metadata (game name, round count, agent
+names, pairings) to redraw it later without re-running any agent. A bare
+name like `my-tournament` is always confined to the `replays/` directory;
+an explicit path (one containing a `/`) is used as-is.
+
+Watch a saved replay back with:
+
+```
+node src/replay/cli.js my-tournament
+```
+
+This redraws the exact same sequence of frames the live broadcast showed
+the first time, purely from the recorded file -- `src/replay/render.js` is
+a pure function from replay data to frame text, which is what makes it
+possible to golden-test: a fixed-seed replay's rendered output is checked
+byte-for-byte against a known-good string in `test/replay.test.js`, so any
+unintended change to the frame layout fails the suite.
 
 Run the test suite:
 

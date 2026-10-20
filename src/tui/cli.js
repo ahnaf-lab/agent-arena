@@ -7,6 +7,11 @@
 //   node src/tui/cli.js prisonersDilemma titForTat alwaysDefect grimTrigger
 //   node src/tui/cli.js resourceSplit fairSplitter greedySplitter randomSplitter:7
 //
+// Add `--save-replay <name>` anywhere in the arguments to also write the
+// finished tournament to replays/<name>.json (see src/replay/), so it can
+// be watched again later with `node src/replay/cli.js <name>` without
+// re-running any agent.
+//
 // Run with no arguments at all and it falls back to DEFAULT_DEMO below, a
 // zero-config Prisoner's Dilemma tournament between the four built-in bots
 // -- the "watch it work with no API keys" path.
@@ -17,6 +22,9 @@ import * as prisonersDilemmaBots from '../bots/prisonersDilemmaBots.js';
 import * as resourceSplitBots from '../bots/resourceSplitBots.js';
 import { createScreen } from './screen.js';
 import { runBroadcast } from './broadcast.js';
+import { buildPairings } from '../tournament/roundRobin.js';
+import { buildReplay } from '../replay/record.js';
+import { saveReplay } from '../replay/store.js';
 
 const GAMES = {
   prisonersDilemma: { engine: prisonersDilemma, bots: prisonersDilemmaBots, defaultRounds: 10 },
@@ -42,26 +50,51 @@ function buildBot(bots, spec) {
 }
 
 export function parseArgs(argv) {
-  const [gameName, ...botSpecs] = argv.length === 0 ? DEFAULT_DEMO : argv;
+  const args = [...argv];
+  let replayName = null;
+  const replayFlagIndex = args.indexOf('--save-replay');
+  if (replayFlagIndex !== -1) {
+    replayName = args[replayFlagIndex + 1];
+    if (!replayName) {
+      throw new Error('--save-replay requires a file name');
+    }
+    args.splice(replayFlagIndex, 2);
+  }
+
+  const [gameName, ...botSpecs] = args.length === 0 ? DEFAULT_DEMO : args;
   if (!gameName || !GAMES[gameName]) {
-    throw new Error(`usage: cli.js <${Object.keys(GAMES).join('|')}> <bot> <bot> [bot...]`);
+    throw new Error(`usage: cli.js <${Object.keys(GAMES).join('|')}> <bot> <bot> [bot...] [--save-replay <name>]`);
   }
   if (botSpecs.length < 2) {
     throw new Error('at least two bots are required to run a tournament');
   }
-  return { gameName, botSpecs };
+  return { gameName, botSpecs, replayName };
 }
 
 export async function main(argv, { screen = createScreen(), delayMs = 400 } = {}) {
-  const { gameName, botSpecs } = parseArgs(argv);
+  const { gameName, botSpecs, replayName } = parseArgs(argv);
   const { engine, bots, defaultRounds } = GAMES[gameName];
   const agents = botSpecs.map((spec) => buildBot(bots, spec));
+  const title = `Agent Arena -- ${gameName}`;
 
-  const { standings } = await runBroadcast(agents, engine, defaultRounds, {
-    title: `Agent Arena -- ${gameName}`,
+  const { standings, frames } = await runBroadcast(agents, engine, defaultRounds, {
+    title,
     delayMs,
     screen,
   });
+
+  if (replayName) {
+    const replay = buildReplay({
+      title,
+      gameName,
+      rounds: defaultRounds,
+      agentNames: agents.map((agent) => agent.name ?? 'agent'),
+      pairings: buildPairings(agents),
+      frames,
+      standings,
+    });
+    saveReplay(replay, replayName);
+  }
 
   return standings;
 }

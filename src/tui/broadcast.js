@@ -18,6 +18,7 @@ export async function runBroadcast(agents, game, rounds, options = {}) {
   const agentNames = agents.map((agent) => agent.name ?? 'agent');
   const pairings = buildPairings(agents);
   const completedByPair = new Map();
+  const frames = [];
 
   const draw = (frameState) => {
     if (screen) screen.draw(renderFrame(frameState));
@@ -30,6 +31,7 @@ export async function runBroadcast(agents, game, rounds, options = {}) {
     gameOptions,
     onMatchComplete: async ({ match, matchNumber, totalMatches, standings: liveStandings }) => {
       completedByPair.set(pairKey(match.indexA, match.indexB), match.result.totalScores);
+      frames.push({ matchNumber, totalMatches, standings: liveStandings, match });
       draw({
         title,
         standings: liveStandings,
@@ -44,5 +46,5 @@ export async function runBroadcast(agents, game, rounds, options = {}) {
     },
   });
 
-  return { matches, standings };
+  return { matches, standings, frames };
 }
