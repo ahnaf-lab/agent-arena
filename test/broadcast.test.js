@@ -80,3 +80,48 @@ test('cli parseArgs leaves replayName null when the flag is absent', () => {
   const { replayName } = parseArgs(['prisonersDilemma', 'titForTat', 'alwaysDefect']);
   assert.strictEqual(replayName, null);
 });
+
+test('cli parseArgs pulls --agent out of the arguments and captures its command and args', () => {
+  const parsed = parseArgs([
+    'prisonersDilemma',
+    'titForTat',
+    '--agent',
+    'remote',
+    'node',
+    'src/mcp/server.js',
+    'prisonersDilemma',
+    'alwaysDefect',
+  ]);
+  assert.deepStrictEqual(parsed.botSpecs, ['titForTat']);
+  assert.deepStrictEqual(parsed.externalAgents, [
+    { name: 'remote', command: 'node', args: ['src/mcp/server.js', 'prisonersDilemma', 'alwaysDefect'] },
+  ]);
+});
+
+test('cli parseArgs supports more than one --agent flag', () => {
+  const parsed = parseArgs([
+    'prisonersDilemma',
+    '--agent',
+    'one',
+    'node',
+    'a.js',
+    '--agent',
+    'two',
+    'node',
+    'b.js',
+  ]);
+  assert.strictEqual(parsed.botSpecs.length, 0);
+  assert.deepStrictEqual(
+    parsed.externalAgents.map((a) => a.name),
+    ['one', 'two']
+  );
+});
+
+test('cli parseArgs lets a bot plus an --agent satisfy the two-player minimum', () => {
+  const parsed = parseArgs(['prisonersDilemma', 'titForTat', '--agent', 'remote', 'node', 'a.js']);
+  assert.strictEqual(parsed.botSpecs.length + parsed.externalAgents.length, 2);
+});
+
+test('cli parseArgs rejects --agent missing a command', () => {
+  assert.throws(() => parseArgs(['prisonersDilemma', 'titForTat', 'alwaysDefect', '--agent', 'remote']));
+});

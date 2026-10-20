@@ -12,6 +12,17 @@
 // be watched again later with `node src/replay/cli.js <name>` without
 // re-running any agent.
 //
+// Add `--agent <name> <command> [arg...]` one or more times to seat an
+// external MCP-speaking agent (any process implementing the tool contract
+// in src/mcp/schema.js) as an additional player alongside the named bots.
+// The command is spawned directly (never through a shell), exactly as
+// src/mcp/client.js documents; everything after the command, up to the
+// next `--agent`/`--save-replay` flag or the end of the arguments, is
+// passed to it as argv. For example, to seat the reference bot server
+// itself as an external player:
+//   node src/tui/cli.js prisonersDilemma titForTat \
+//     --agent remote node src/mcp/server.js prisonersDilemma grimTrigger
+//
 // Run with no arguments at all and it falls back to DEFAULT_DEMO below, a
 // zero-config Prisoner's Dilemma tournament between the four built-in bots
 // -- the "watch it work with no API keys" path.
@@ -25,6 +36,7 @@ import { runBroadcast } from './broadcast.js';
 import { buildPairings } from '../tournament/roundRobin.js';
 import { buildReplay } from '../replay/record.js';
 import { saveReplay } from '../replay/store.js';
+import { createMcpAgent } from '../mcp/client.js';
 
 const GAMES = {
   prisonersDilemma: { engine: prisonersDilemma, bots: prisonersDilemmaBots, defaultRounds: 10 },
@@ -49,6 +61,8 @@ function buildBot(bots, spec) {
   return factory(seed);
 }
 
+const ARG_FLAGS = ['--agent', '--save-replay'];
+
 export function parseArgs(argv) {
   const args = [...argv];
   let replayName = null;
@@ -61,42 +75,69 @@ export function parseArgs(argv) {
     args.splice(replayFlagIndex, 2);
   }
 
+  const externalAgents = [];
+  let agentFlagIndex;
+  while ((agentFlagIndex = args.indexOf('--agent')) !== -1) {
+    const name = args[agentFlagIndex + 1];
+    const command = args[agentFlagIndex + 2];
+    if (!name || !command) {
+      throw new Error('--agent requires a name and a command, e.g. --agent remote node server.js');
+    }
+    let end = agentFlagIndex + 3;
+    while (end < args.length && !ARG_FLAGS.includes(args[end])) end++;
+    const commandArgs = args.slice(agentFlagIndex + 3, end);
+    externalAgents.push({ name, command, args: commandArgs });
+    args.splice(agentFlagIndex, end - agentFlagIndex);
+  }
+
   const [gameName, ...botSpecs] = args.length === 0 ? DEFAULT_DEMO : args;
   if (!gameName || !GAMES[gameName]) {
-    throw new Error(`usage: cli.js <${Object.keys(GAMES).join('|')}> <bot> <bot> [bot...] [--save-replay <name>]`);
+    throw new Error(
+      `usage: cli.js <${Object.keys(GAMES).join('|')}> <bot> <bot> [bot...] ` +
+        '[--agent <name> <command> [arg...]] [--save-replay <name>]'
+    );
   }
-  if (botSpecs.length < 2) {
-    throw new Error('at least two bots are required to run a tournament');
+  if (botSpecs.length + externalAgents.length < 2) {
+    throw new Error('at least two agents are required to run a tournament');
   }
-  return { gameName, botSpecs, replayName };
+  return { gameName, botSpecs, externalAgents, replayName };
 }
 
 export async function main(argv, { screen = createScreen(), delayMs = 400 } = {}) {
-  const { gameName, botSpecs, replayName } = parseArgs(argv);
+  const { gameName, botSpecs, externalAgents, replayName } = parseArgs(argv);
   const { engine, bots, defaultRounds } = GAMES[gameName];
-  const agents = botSpecs.map((spec) => buildBot(bots, spec));
+  const agents = [
+    ...botSpecs.map((spec) => buildBot(bots, spec)),
+    ...externalAgents.map(({ name, command, args }) => createMcpAgent({ command, args, name })),
+  ];
   const title = `Agent Arena -- ${gameName}`;
 
-  const { standings, frames } = await runBroadcast(agents, engine, defaultRounds, {
-    title,
-    delayMs,
-    screen,
-  });
-
-  if (replayName) {
-    const replay = buildReplay({
+  try {
+    const { standings, frames } = await runBroadcast(agents, engine, defaultRounds, {
       title,
-      gameName,
-      rounds: defaultRounds,
-      agentNames: agents.map((agent) => agent.name ?? 'agent'),
-      pairings: buildPairings(agents),
-      frames,
-      standings,
+      delayMs,
+      screen,
     });
-    saveReplay(replay, replayName);
-  }
 
-  return standings;
+    if (replayName) {
+      const replay = buildReplay({
+        title,
+        gameName,
+        rounds: defaultRounds,
+        agentNames: agents.map((agent) => agent.name ?? 'agent'),
+        pairings: buildPairings(agents),
+        frames,
+        standings,
+      });
+      saveReplay(replay, replayName);
+    }
+
+    return standings;
+  } finally {
+    for (const agent of agents) {
+      if (typeof agent.close === 'function') agent.close();
+    }
+  }
 }
 
 const isMainModule = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;

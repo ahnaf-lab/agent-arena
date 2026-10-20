@@ -11,9 +11,11 @@ scripted bots -- a minimal MCP tool contract that lets any MCP-speaking
 agent submit moves against that engine from its own process, a terminal
 broadcast that runs a round-robin tournament between any set of agents
 and redraws a live score table, bracket, and round-by-round move history
-after each match, and a replay format that saves a finished tournament
+after each match, a replay format that saves a finished tournament
 to a JSON file and can redraw it frame-by-frame later with no agents and
-no game logic involved, all backed by a fixed-seed test suite.
+no game logic involved, and an adapter that seats any external
+MCP-speaking process as a tournament player via `--agent`, all backed by
+a fixed-seed test suite.
 
 ## Install
 
@@ -136,6 +138,38 @@ be unit tested without a real terminal; `src/tui/screen.js` is the only
 module that writes to the terminal, and `src/tui/broadcast.js` paces the
 redraws against `src/tournament/roundRobin.js`, which plays every unique
 pairing of agents once and ranks the resulting standings.
+
+### Seating an external agent
+
+Built-in bots aren't the only players a broadcast can seat. Add
+`--agent <name> <command> [arg...]` once per external player to spawn any
+process that speaks the MCP tool contract above and have it play a full
+tournament alongside the named bots:
+
+```
+npm start -- prisonersDilemma titForTat \
+  --agent my-agent node path/to/my-agent-server.js
+```
+
+`<command>` is spawned directly with `<arg...>` as its argv (never through
+a shell, so there is no quoting or injection to worry about), wired up
+exactly the way `src/mcp/client.js`'s `createMcpAgent` is used in
+`src/mcp/server.js` and `test/mcp.test.js`; the external process just
+needs to answer `initialize` and the `choose_move`/`choose_claim` tool
+calls described above. Everything after `<command>`, up to the next
+`--agent`, `--save-replay`, or the end of the arguments, is passed to the
+child process as its own arguments, so the bot server shipped in this
+repo can itself be seated as an "external" agent for a quick smoke test:
+
+```
+npm start -- prisonersDilemma titForTat \
+  --agent remote node src/mcp/server.js prisonersDilemma grimTrigger
+```
+
+Multiple `--agent` flags can be combined with any number of named bots;
+at least two players total (bots plus external agents) are required.
+Every external agent's child process is closed once the tournament ends,
+whether it finishes normally or raises an error.
 
 ### Replays
 
